@@ -1,0 +1,64 @@
+version: "3.8"
+
+networks:
+  healthcare-internal:
+    external: true
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: healthcare-traefik
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+    networks:
+      - healthcare-internal
+
+  # Frontend Gateway / App Container
+  healthcare-app:
+    build:
+      context: ../healthcare-app
+      dockerfile: Dockerfile
+    container_name: healthcare-app
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    networks:
+      - healthcare-internal
+
+  # Auth & User Microservice (NestJS)
+  auth-service:
+    build:
+      context: ../auth-service
+      dockerfile: Dockerfile
+    container_name: ms-auth-service
+    restart: unless-stopped
+    env_file:
+      - ../auth-service/.env.local
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/auth`) || PathPrefix(`/users`)"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.services.auth.loadbalancer.server.port=3000"
+    networks:
+      - healthcare-internal
+
+  # Notification Microservice
+  notification-api:
+    build:
+      context: ../notification-api
+      dockerfile: Dockerfile
+    container_name: ms-notification-api
+    restart: unless-stopped
+    env_file:
+      - ../notification-api/.env.local
+    labels:
+      - "traefik.enable=false" # Internal only; not exposed through public gateway[cite: 3, 5]
+    networks:
+      - healthcare-internal
