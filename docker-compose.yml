@@ -13,16 +13,16 @@ services:
       - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik.yaml:/etc/traefik/traefik.yaml:ro
     networks:
       - healthcare-internal
 
-  # Frontend Gateway / App Container
+  # Frontend Application (React / Vite)
   healthcare-app:
     build:
-      context: ../healthcare-app
+      context: ./healthcare-app
       dockerfile: Dockerfile
-    container_name: healthcare-app
+    container_name: healthcare-frontend
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
@@ -35,12 +35,12 @@ services:
   # Auth & User Microservice (NestJS)
   auth-service:
     build:
-      context: ../auth-service
+      context: ./healthcare-api
       dockerfile: Dockerfile
-    container_name: ms-auth-service
+    container_name: healthcare-auth-service
     restart: unless-stopped
     env_file:
-      - ../auth-service/.env.local
+      - ./healthcare-api/.env.local
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.auth.rule=PathPrefix(`/auth`) || PathPrefix(`/users`)"
@@ -49,16 +49,33 @@ services:
     networks:
       - healthcare-internal
 
-  # Notification Microservice
-  notification-api:
+  # Observability Microservice
+  observability-service:
     build:
-      context: ../notification-api
+      context: ./healthcare-observability-api
       dockerfile: Dockerfile
-    container_name: ms-notification-api
+    container_name: healthcare-observability-service
     restart: unless-stopped
     env_file:
-      - ../notification-api/.env.local
+      - ./healthcare-observability-api/.env.local
     labels:
-      - "traefik.enable=false" # Internal only; not exposed through public gateway[cite: 3, 5]
+      - "traefik.enable=true"
+      - "traefik.http.routers.observability.rule=PathPrefix(`/observability`)"
+      - "traefik.http.routers.observability.entrypoints=web"
+      - "traefik.http.services.observability.loadbalancer.server.port=3001"
+    networks:
+      - healthcare-internal
+
+  # Notification Microservice (Internal background worker / API)
+  notification-service:
+    build:
+      context: ./healthcare-notification-api
+      dockerfile: Dockerfile
+    container_name: healthcare-notification-service
+    restart: unless-stopped
+    env_file:
+      - ./healthcare-notification-api/.env.local
+    labels:
+      - "traefik.enable=false" # Internal only; accessed securely via container network or service key[cite: 3, 5]
     networks:
       - healthcare-internal
