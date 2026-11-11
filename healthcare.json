@@ -1,0 +1,14 @@
+{
+  "healthcare-app": {
+    "url": "https://github.com/eaglesdgreat/healthcare-app"
+  },
+  "auth-service": {
+    "url": "https://github.com/eaglesdgreat/healthcare-api"
+  },
+  "observability-service": {
+    "url": "https://github.com/eaglesdgreat/healthcare-observability-api"
+  },
+  "notification-service": {
+    "url": "https://github.com/eaglesdgreat/healthcare-notification-api"
+  }
+}
